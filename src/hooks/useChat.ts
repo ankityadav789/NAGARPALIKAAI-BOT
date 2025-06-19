@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Message, Complaint, IssueCategory, ComplaintSession } from '../types/chat';
+import { Message, Complaint, IssueCategory, ComplaintSession, ResolutionSession } from '../types/chat';
 
 export const useChat = () => {
   const [messages, setMessages] = useState<Message[]>([
@@ -15,6 +15,7 @@ export const useChat = () => {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [complaintSession, setComplaintSession] = useState<ComplaintSession | null>(null);
+  const [resolutionSession, setResolutionSession] = useState<ResolutionSession | null>(null);
   const [lastComplaint, setLastComplaint] = useState<Complaint | null>(null);
 
   const generateComplaintId = useCallback(() => {
@@ -53,6 +54,84 @@ export const useChat = () => {
     
     const lowerMessage = userMessage.toLowerCase();
     
+    // Handle resolution session flow
+    if (resolutionSession) {
+      if (resolutionSession.step === 'check') {
+        const isResolved = lowerMessage.includes('yes') || lowerMessage.includes('resolved') || lowerMessage.includes('fixed') || lowerMessage.includes('solved');
+        const isNotResolved = lowerMessage.includes('no') || lowerMessage.includes('not') || lowerMessage.includes('still') || lowerMessage.includes('problem');
+        
+        if (isResolved) {
+          // Mark complaint as resolved with positive feedback
+          setComplaints(prev => prev.map(complaint => 
+            complaint.id === resolutionSession.complaintId 
+              ? {
+                  ...complaint,
+                  status: 'resolved' as const,
+                  resolutionFeedback: {
+                    isResolved: true,
+                    feedbackDate: new Date(),
+                    userMessage: userMessage
+                  }
+                }
+              : complaint
+          ));
+          
+          addMessage(
+            '🎉 **Great News!**\n\nThank you for confirming that your complaint has been resolved! We\'re glad we could help solve your issue.\n\n✅ **Status Updated:** Your complaint is now marked as RESOLVED\n⭐ **Feedback:** We appreciate your confirmation\n\n📊 **Help Us Improve:**\nYour feedback helps us serve citizens better. Consider sharing your experience using the Feedback button.\n\n🙏 Thank you for using Nagar Palika services!',
+            'bot'
+          );
+          
+          setResolutionSession(null);
+          return;
+        } else if (isNotResolved) {
+          // Mark complaint as unresolved and offer WhatsApp option
+          const complaint = complaints.find(c => c.id === resolutionSession.complaintId);
+          
+          setComplaints(prev => prev.map(c => 
+            c.id === resolutionSession.complaintId 
+              ? {
+                  ...c,
+                  status: 'unresolved' as const,
+                  resolutionFeedback: {
+                    isResolved: false,
+                    feedbackDate: new Date(),
+                    userMessage: userMessage
+                  }
+                }
+              : c
+          ));
+          
+          if (complaint) {
+            setLastComplaint({
+              ...complaint,
+              status: 'unresolved',
+              resolutionFeedback: {
+                isResolved: false,
+                feedbackDate: new Date(),
+                userMessage: userMessage
+              }
+            });
+          }
+          
+          addMessage(
+            '😔 **We\'re Sorry to Hear That**\n\nWe understand your complaint is still not resolved. This is not the service standard we aim for.\n\n🚨 **Status Updated:** Your complaint is now marked as UNRESOLVED\n📝 **Your Feedback:** Recorded for priority action\n\n📞 **Immediate Action:**\nClick the WhatsApp button below to directly contact our support team with your complaint details. They will prioritize your case and provide immediate assistance.\n\n⚡ **Priority Support:** Unresolved complaints get highest priority\n🔄 **Follow-up:** We\'ll ensure regular updates until resolution\n\nWe apologize for the inconvenience and will work to resolve this quickly.',
+            'bot'
+          );
+          
+          setResolutionSession(null);
+          return;
+        } else {
+          // Ask for clarification
+          addMessage(
+            '🤔 **Please Clarify**\n\nI need a clear answer to help you better. Please respond with:\n\n✅ **"Yes"** - if your problem has been resolved\n❌ **"No"** - if your problem is still not resolved\n\nThis helps us track our service quality and take appropriate action.',
+            'bot',
+            'resolution-check'
+          );
+          return;
+        }
+      }
+    }
+    
     // Handle complaint session flow
     if (complaintSession) {
       if (complaintSession.step === 'location') {
@@ -86,7 +165,7 @@ export const useChat = () => {
     if (lowerMessage.includes('status') || (lowerMessage.includes('complaint') && lowerMessage.includes('id'))) {
       const statusResponse = complaints.length > 0 
         ? `📋 Your Recent Complaints:\n\n${complaints.slice(-3).map(c => 
-            `🆔 ${c.id}\n📝 ${c.category} - ${c.description.substring(0, 50)}...\n📍 Location: ${c.location}\n📊 Status: ${c.status.toUpperCase()}\n⏰ ${c.timestamp.toLocaleDateString()}`
+            `🆔 ${c.id}\n📝 ${c.category} - ${c.description.substring(0, 50)}...\n📍 Location: ${c.location}\n📊 Status: ${c.status.toUpperCase().replace('-', ' ')}\n⏰ ${c.timestamp.toLocaleDateString()}`
           ).join('\n\n')}\n\n💬 Need help with any complaint? Just mention the complaint ID!\n\n👁️ You can also click "My Complaints" in quick actions to view all complaints.`
         : '📋 No complaints found in our system.\n\nWould you like to report a new issue? Please select a category from the quick actions below.';
       
@@ -109,7 +188,7 @@ export const useChat = () => {
       '🤔 I\'d be happy to help you report an issue!\n\nTo ensure I can assist you properly, please:\n\n1️⃣ Select an issue category from the quick actions below\n2️⃣ Or type "help" to see all available options\n3️⃣ Use "My Complaints" to view your complaint history\n4️⃣ Click "Feedback" to share your experience\n\nThis helps me guide you through the proper complaint process.',
       'bot'
     );
-  }, [addMessage, simulateTyping, complaints, complaintSession]);
+  }, [addMessage, simulateTyping, complaints, complaintSession, resolutionSession]);
 
   const handleComplaintSubmission = useCallback(async (category: IssueCategory, location: string, description: string, images: File[]) => {
     const complaintId = generateComplaintId();
@@ -190,22 +269,60 @@ export const useChat = () => {
     );
   }, [simulateTyping, addMessage]);
 
+  const handleResolutionCheck = useCallback(async (complaintId: string) => {
+    const complaint = complaints.find(c => c.id === complaintId);
+    if (!complaint) return;
+    
+    setResolutionSession({ complaintId, step: 'check' });
+    
+    // Simulate typing
+    await simulateTyping(1000);
+    
+    addMessage(
+      `🔍 **Resolution Check for Complaint #${complaintId}**\n\n📝 **Issue:** ${complaint.category} - ${complaint.description.substring(0, 100)}${complaint.description.length > 100 ? '...' : ''}\n📍 **Location:** ${complaint.location}\n📅 **Reported:** ${complaint.timestamp.toLocaleDateString()}\n\n❓ **Has your problem been resolved?**\n\nPlease respond with:\n✅ **"Yes"** - if the problem has been fixed\n❌ **"No"** - if the problem still exists\n\nYour feedback helps us improve our services and take appropriate action.`,
+      'bot',
+      'resolution-check',
+      { complaintId }
+    );
+  }, [complaints, simulateTyping, addMessage]);
+
   const handleWhatsAppRedirect = useCallback(() => {
-    const phoneNumber = '918808201876'; // Updated phone number
+    const phoneNumber = '918808201876';
     let message = '';
     
     if (lastComplaint) {
-      // If there's a recent complaint, include its details
-      message = encodeURIComponent(
-        `Hello Nagar Palika,\n\nComplaint Done!\n\nComplaint Details:\n` +
-        `🆔 ID: ${lastComplaint.id}\n` +
-        `📝 Category: ${lastComplaint.category}\n` +
-        `📍 Location: ${lastComplaint.location}\n` +
-        `📋 Description: ${lastComplaint.description}\n` +
-        `📊 Status: ${lastComplaint.status.toUpperCase()}\n` +
-        `📅 Date: ${lastComplaint.timestamp.toLocaleDateString()}\n\n` +
-        `Please provide updates on this complaint. Thank you!`
-      );
+      if (lastComplaint.resolutionFeedback && !lastComplaint.resolutionFeedback.isResolved) {
+        // Unresolved complaint message
+        message = encodeURIComponent(
+          `🚨 URGENT: Unresolved Complaint\n\n` +
+          `Hello Nagar Palika Support Team,\n\n` +
+          `My problem is NOT RESOLVED yet. Please solve it rapidly as much as possible.\n\n` +
+          `📋 COMPLAINT DETAILS:\n` +
+          `🆔 ID: ${lastComplaint.id}\n` +
+          `📝 Category: ${lastComplaint.category}\n` +
+          `📍 Location: ${lastComplaint.location}\n` +
+          `📋 Description: ${lastComplaint.description}\n` +
+          `📊 Status: ${lastComplaint.status.toUpperCase()}\n` +
+          `📅 Reported: ${lastComplaint.timestamp.toLocaleDateString()}\n` +
+          `📅 Feedback Date: ${lastComplaint.resolutionFeedback.feedbackDate.toLocaleDateString()}\n\n` +
+          `💬 User Feedback: "${lastComplaint.resolutionFeedback.userMessage}"\n\n` +
+          `⚡ PRIORITY REQUEST: This complaint needs immediate attention as it remains unresolved.\n\n` +
+          `Please provide immediate assistance and regular updates until this issue is completely resolved.\n\n` +
+          `Thank you for your urgent attention to this matter.`
+        );
+      } else {
+        // Regular complaint message
+        message = encodeURIComponent(
+          `Hello Nagar Palika,\n\nComplaint Done!\n\nComplaint Details:\n` +
+          `🆔 ID: ${lastComplaint.id}\n` +
+          `📝 Category: ${lastComplaint.category}\n` +
+          `📍 Location: ${lastComplaint.location}\n` +
+          `📋 Description: ${lastComplaint.description}\n` +
+          `📊 Status: ${lastComplaint.status.toUpperCase()}\n` +
+          `📅 Date: ${lastComplaint.timestamp.toLocaleDateString()}\n\n` +
+          `Please provide updates on this complaint. Thank you!`
+        );
+      }
     } else {
       // Default message if no complaint
       message = encodeURIComponent('Hello Nagar Palika, I want to connect regarding municipal services.');
@@ -220,9 +337,11 @@ export const useChat = () => {
     complaints,
     isTyping,
     complaintSession,
+    resolutionSession,
     lastComplaint,
     processUserMessage,
     handleQuickAction,
+    handleResolutionCheck,
     handleWhatsAppRedirect
   };
 };

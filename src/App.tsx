@@ -19,6 +19,7 @@ function App() {
     complaints,
     processUserMessage,
     handleQuickAction,
+    handleResolutionCheck,
     handleWhatsAppRedirect
   } = useChat();
   
@@ -177,6 +178,7 @@ function App() {
         complaints={complaints}
         isOpen={isComplaintModalOpen}
         onClose={() => setIsComplaintModalOpen(false)}
+        onResolutionCheck={handleResolutionCheck}
       />
 
       <FeedbackModal
