@@ -1,19 +1,17 @@
 import React from 'react';
-import { X, Clock, CheckCircle, AlertCircle, Calendar, MapPin, FileText, MessageCircle, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { X, Clock, CheckCircle, AlertCircle, Calendar, MapPin, FileText } from 'lucide-react';
 import { Complaint } from '../types/chat';
 
 interface ComplaintListModalProps {
   complaints: Complaint[];
   isOpen: boolean;
   onClose: () => void;
-  onResolutionCheck: (complaintId: string) => void;
 }
 
 export const ComplaintListModal: React.FC<ComplaintListModalProps> = ({
   complaints,
   isOpen,
-  onClose,
-  onResolutionCheck
+  onClose
 }) => {
   if (!isOpen) return null;
 
@@ -25,8 +23,6 @@ export const ComplaintListModal: React.FC<ComplaintListModalProps> = ({
         return <AlertCircle size={16} className="text-blue-500" />;
       case 'resolved':
         return <CheckCircle size={16} className="text-green-500" />;
-      case 'unresolved':
-        return <AlertCircle size={16} className="text-red-500" />;
       default:
         return <Clock size={16} className="text-gray-500" />;
     }
@@ -40,15 +36,9 @@ export const ComplaintListModal: React.FC<ComplaintListModalProps> = ({
         return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'resolved':
         return 'bg-green-100 text-green-800 border-green-200';
-      case 'unresolved':
-        return 'bg-red-100 text-red-800 border-red-200';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200';
     }
-  };
-
-  const canCheckResolution = (complaint: Complaint) => {
-    return complaint.status === 'resolved' && !complaint.resolutionFeedback;
   };
 
   return (
@@ -97,7 +87,7 @@ export const ComplaintListModal: React.FC<ComplaintListModalProps> = ({
                     </div>
                     <div className={`px-3 py-1 rounded-full border text-xs font-semibold flex items-center gap-1 ${getStatusColor(complaint.status)}`}>
                       {getStatusIcon(complaint.status)}
-                      {complaint.status.toUpperCase().replace('-', ' ')}
+                      {complaint.status.toUpperCase()}
                     </div>
                   </div>
 
@@ -138,49 +128,6 @@ export const ComplaintListModal: React.FC<ComplaintListModalProps> = ({
                             <span className="text-xs text-gray-500">+{complaint.images.length - 3}</span>
                           </div>
                         )}
-                      </div>
-                    )}
-
-                    {/* Resolution Feedback Display */}
-                    {complaint.resolutionFeedback && (
-                      <div className={`mt-3 p-3 rounded-lg border-2 ${
-                        complaint.resolutionFeedback.isResolved 
-                          ? 'bg-green-50 border-green-200' 
-                          : 'bg-red-50 border-red-200'
-                      }`}>
-                        <div className="flex items-center gap-2 mb-2">
-                          {complaint.resolutionFeedback.isResolved ? (
-                            <ThumbsUp size={16} className="text-green-600" />
-                          ) : (
-                            <ThumbsDown size={16} className="text-red-600" />
-                          )}
-                          <span className={`text-sm font-semibold ${
-                            complaint.resolutionFeedback.isResolved ? 'text-green-700' : 'text-red-700'
-                          }`}>
-                            {complaint.resolutionFeedback.isResolved ? 'Problem Resolved' : 'Problem Not Resolved'}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-600">
-                          Feedback given on {complaint.resolutionFeedback.feedbackDate.toLocaleDateString()}
-                        </p>
-                        {complaint.resolutionFeedback.userMessage && (
-                          <p className="text-sm text-gray-700 mt-2 italic">
-                            "{complaint.resolutionFeedback.userMessage}"
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Resolution Check Button */}
-                    {canCheckResolution(complaint) && (
-                      <div className="mt-4 pt-3 border-t border-gray-200">
-                        <button
-                          onClick={() => onResolutionCheck(complaint.id)}
-                          className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-2 px-4 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 flex items-center justify-center gap-2 text-sm font-medium"
-                        >
-                          <MessageCircle size={16} />
-                          Check if Problem is Resolved
-                        </button>
                       </div>
                     )}
                   </div>

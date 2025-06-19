@@ -3,12 +3,11 @@ export interface Message {
   text: string;
   sender: 'user' | 'bot';
   timestamp: Date;
-  type?: 'welcome' | 'menu' | 'complaint' | 'status' | 'category-selection' | 'location-request' | 'complaint-form' | 'resolution-check';
+  type?: 'welcome' | 'menu' | 'complaint' | 'status' | 'category-selection' | 'location-request' | 'complaint-form';
   metadata?: {
     category?: IssueCategory;
     location?: string;
     images?: string[];
-    complaintId?: string;
   };
 }
 
@@ -18,13 +17,8 @@ export interface Complaint {
   description: string;
   location: string;
   images?: string[];
-  status: 'pending' | 'in-progress' | 'resolved' | 'unresolved';
+  status: 'pending' | 'in-progress' | 'resolved';
   timestamp: Date;
-  resolutionFeedback?: {
-    isResolved: boolean;
-    feedbackDate: Date;
-    userMessage?: string;
-  };
 }
 
 export type IssueCategory = 'sanitation' | 'road' | 'water' | 'other';
@@ -35,9 +29,4 @@ export interface ComplaintSession {
   location?: string;
   description?: string;
   images?: File[];
-}
-
-export interface ResolutionSession {
-  complaintId: string;
-  step: 'check' | 'feedback' | 'completed';
 }
